@@ -5,19 +5,20 @@ the big picture, see [SKILL.md](../SKILL.md).
 
 ## Contents
 - [Conventions](#conventions)
-- Research (whole corpus):
+- Whole-corpus search:
   [docketbird_search_cases](#docketbird_search_cases) ·
   [docketbird_fulltext_search](#docketbird_fulltext_search) ·
+  [docketbird_ask_litigation_graph](#docketbird_ask_litigation_graph) ·
+  [docketbird_list_courts](#docketbird_list_courts) ·
+  [docketbird_list_court_systems](#docketbird_list_court_systems)
+- Case access required (account must follow the case):
   [docketbird_get_case](#docketbird_get_case) ·
   [docketbird_get_case_details](#docketbird_get_case_details) ·
   [docketbird_search_documents](#docketbird_search_documents) ·
   [docketbird_get_document](#docketbird_get_document) ·
   [docketbird_get_document_text](#docketbird_get_document_text) ·
   [docketbird_download_document](#docketbird_download_document) ·
-  [docketbird_download_files](#docketbird_download_files) ·
-  [docketbird_ask_litigation_graph](#docketbird_ask_litigation_graph) ·
-  [docketbird_list_courts](#docketbird_list_courts) ·
-  [docketbird_list_court_systems](#docketbird_list_court_systems)
+  [docketbird_download_files](#docketbird_download_files)
 - Account (your firm's data):
   [docketbird_list_cases](#docketbird_list_cases) ·
   [docketbird_get_calendar](#docketbird_get_calendar) ·
@@ -64,8 +65,10 @@ the big picture, see [SKILL.md](../SKILL.md).
 `docketbird_fulltext_search(query, court_id="", case_id="", filed_after="", filed_before="", my_cases_only=False, sort="relevance", size=25, cursor="")`
 
 - `query` (required, max 500 chars). Operators: space/`and` (all terms), `or`,
-  `-term` (exclude; the word `not` is unsupported), `term*`/`term!` (endings),
-  `/n` `/s` `/p` (proximity), `"..."` (phrase). Emails and `§`/`¶` are searchable.
+  `-term` (exclude), `term*`/`term!` (endings), `/n` `/s` `/p` (proximity),
+  `"..."` (phrase). Emails and `§`/`¶` are searchable. Note: `not` is treated as
+  a literal term, not a boolean NOT operator; unbalanced quotes are rejected
+  with a 400.
 - `court_id`: comma-separated; each entry a slug (`nysd`), abbreviation
   (`S.D.N.Y.`), or full court name. Multiple courts are fanned out one request per
   court and merged — smaller per-court queries are less likely to hit the backend's
@@ -79,6 +82,8 @@ the big picture, see [SKILL.md](../SKILL.md).
   `docketbird_search_documents`). Result window: first 10,000 matches.
 - Transient failures (a raw 500 or timeout when a query crosses DocketBird's
   internal ~15 s limit) are retried once automatically; no action needed.
+  Run searches sequentially, not in parallel — DocketBird rejects concurrent
+  searches with a 429 ("you already have 2 in progress").
 
 ## docketbird_get_case
 
@@ -88,7 +93,8 @@ the big picture, see [SKILL.md](../SKILL.md).
 - Returns: markdown — title, ID, court, filed date, PACER URL, PACER case ID /
   client code when present, and the complaint pointer with fetch hint.
 - Notes: single `GET /cases/{id}` — no docket fetch, so it cannot hit the
-  large-docket timeout. Works for cases outside the account.
+  large-docket timeout. Requires account access: returns 403 ("follow it, charges
+  may apply") for cases the account has not followed.
 
 ## docketbird_get_case_details
 

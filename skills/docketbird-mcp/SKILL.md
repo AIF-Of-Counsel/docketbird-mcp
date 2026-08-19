@@ -11,10 +11,13 @@ DocketBird API key, so account-scoped results reflect what that account can acce
 
 ## Two scopes — don't mix them up
 
-- **Research scope** (whole corpus: all courts, all cases, regardless of your
-  account): `search_cases`, `fulltext_search` (default), `get_case`,
-  `get_case_details`, `search_documents`, document tools, `ask_litigation_graph`,
+- **Whole-corpus search** (all courts, all cases, no per-case access needed):
+  `search_cases`, `fulltext_search` (default), `ask_litigation_graph`,
   `list_courts`, `list_court_systems`.
+- **Case access required** (the account must have **followed** the case —
+  otherwise DocketBird returns 403 "follow it, charges may apply"): `get_case`,
+  `get_case_details`, `search_documents`, and the document tools
+  (`get_document`, `get_document_text`, `download_document`, `download_files`).
 - **Account scope** (your firm's own DocketBird data): `list_cases`,
   `get_calendar`, `create_autocalendar`, `follow_case`, and
   `fulltext_search(my_cases_only=True)`.
