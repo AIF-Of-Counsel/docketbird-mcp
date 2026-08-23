@@ -162,6 +162,12 @@ For a deeper look at how the server is wired together (OAuth flow, request
 lifecycle, database schema, security model), see
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
+## Contributing and Security
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for setup,
+testing, and pull-request guidance. Report suspected vulnerabilities privately
+as described in [SECURITY.md](SECURITY.md).
+
 ## Troubleshooting
 
 - **stdio client shows JSON parse errors:** ensure nothing in your environment
