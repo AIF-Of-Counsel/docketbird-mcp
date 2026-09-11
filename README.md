@@ -4,8 +4,9 @@ An MCP server for searching and downloading court documents via the DocketBird A
 
 ## Tools
 
-Research tools work across DocketBird's full index (all courts, all cases);
-account tools act on your firm's own DocketBird data.
+Whole-corpus search tools work across DocketBird's full index (all courts, all
+cases); case-specific tools require the account to have followed the case; account
+tools act on your firm's own DocketBird data.
 
 | Tool                              | Description                                     |
 | --------------------------------- | ----------------------------------------------- |

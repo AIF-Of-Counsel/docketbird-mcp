@@ -48,3 +48,8 @@ data/
 .dmux/
 
 for-deletion/
+
+.pi/
+.claude/
+.superpowers/
+.codex/
