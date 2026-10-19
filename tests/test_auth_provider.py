@@ -8,7 +8,7 @@ rotation, cross-client guards, and revocation.
 import time
 
 import pytest
-from mcp.server.auth.provider import AuthorizationParams, TokenError
+from mcp.server.auth.provider import AuthorizationParams, AuthorizeError, TokenError
 from mcp.shared.auth import OAuthClientInformationFull
 
 from auth_provider import (
@@ -220,3 +220,65 @@ async def test_revoke_refresh_token(provider, auth_db):
     await auth_db.save_refresh_token(token)
     await provider.revoke_token(token)
     assert await auth_db.get_refresh_token("ref-revoke") is None
+
+
+# ---------------------------------------------------------------------------
+# RFC 8707 resource (audience) check
+# ---------------------------------------------------------------------------
+
+
+async def _seed_access_token(auth_db, resource):
+    uid = await auth_db.create_user("aud@example.com", "password123", "k")
+    await auth_db.save_access_token(
+        DocketBirdAccessToken(
+            token="acc-aud",
+            client_id="client-abc",
+            scopes=["docketbird"],
+            expires_at=int(time.time() + 3600),
+            resource=resource,
+            docketbird_api_key="k",
+            user_id=uid,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "resource",
+    ["https://app.docketbird-mcp.com", "https://app.docketbird-mcp.com/mcp", "https://APP.docketbird-mcp.com/mcp/"],
+)
+async def test_load_access_token_accepts_this_resource(provider, auth_db, resource):
+    await _seed_access_token(auth_db, resource)
+    assert await provider.load_access_token("acc-aud") is not None
+
+
+@pytest.mark.parametrize(
+    "resource",
+    [
+        "https://other.example.com/mcp",
+        "http://app.docketbird-mcp.com/mcp",
+        "https://app.docketbird-mcp.com.evil.example/mcp",
+        "",
+    ],
+)
+async def test_load_access_token_refuses_other_resource(provider, auth_db, resource):
+    await _seed_access_token(auth_db, resource)
+    assert await provider.load_access_token("acc-aud") is None
+
+
+async def test_load_access_token_accepts_no_resource(provider, auth_db):
+    # Refreshed tokens and clients that omit `resource` carry None.
+    await _seed_access_token(auth_db, None)
+    assert await provider.load_access_token("acc-aud") is not None
+
+
+async def test_authorize_refuses_other_resource(provider):
+    params = _params()
+    params.resource = "https://other.example.com/mcp"
+    with pytest.raises(AuthorizeError):
+        await provider.authorize(_client(), params)
+
+
+async def test_authorize_accepts_no_resource(provider):
+    params = _params()
+    params.resource = None
+    assert (await provider.authorize(_client(), params)).startswith("https://app.docketbird-mcp.com/login")
