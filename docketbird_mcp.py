@@ -158,6 +158,9 @@ mcp = FastMCP(
     auth=AuthSettings(
         issuer_url=SERVER_URL,
         resource_server_url=SERVER_URL,
+        # The SDK check wants an exact match and refuses tokens without a resource;
+        # DocketBirdAuthProvider.load_access_token checks the resource itself.
+        validate_token_resource=False,
         client_registration_options=ClientRegistrationOptions(
             enabled=True,
             valid_scopes=["docketbird"],

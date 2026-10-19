@@ -11,19 +11,21 @@ import os
 os.environ.setdefault("DATA_DIR", "/tmp/docketbird-test-data")
 
 import json
+import time
 
 import pytest
 
 import docketbird_mcp as d
+from auth_provider import DocketBirdAccessToken
 
 
-async def _call_app(path: str, client_ip: str, method: str = "GET"):
+async def _call_app(path: str, client_ip: str, method: str = "GET", headers=()):
     """Drive `d.app` for a single HTTP request and collect the response."""
     scope = {
         "type": "http",
         "method": method,
         "path": path,
-        "headers": [],
+        "headers": list(headers),
         "query_string": b"",
         "client": (client_ip, 12345),
     }
@@ -74,3 +76,36 @@ async def test_signup_path_dispatch():
     status, body = await _call_app("/signup", "10.2.2.2")
     assert status == 200
     assert b"Create Account" in body
+
+
+async def _seed_token(auth_db, resource):
+    uid = await auth_db.create_user("aud@example.com", "password123", "k")
+    await auth_db.save_access_token(
+        DocketBirdAccessToken(
+            token="acc-aud",
+            client_id="client-abc",
+            scopes=["docketbird"],
+            expires_at=int(time.time() + 3600),
+            resource=resource,
+            docketbird_api_key="k",
+            user_id=uid,
+        )
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("resource", "expect_401"),
+    [(f"{d.SERVER_URL}/mcp", False), (None, False), ("https://other.example.com/mcp", True)],
+)
+async def test_mcp_bearer_resource_check(monkeypatch, auth_db, resource, expect_401):
+    monkeypatch.setattr(d.auth_provider, "db", auth_db)
+
+    async def _ok(scope, receive, send):  # stands in for the MCP session manager behind the auth check
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    monkeypatch.setattr(d.mcp.session_manager, "handle_request", _ok)
+    await _seed_token(auth_db, resource)
+    status, _ = await _call_app("/mcp", "10.3.3.3", "POST", [(b"authorization", b"Bearer acc-aud")])
+    assert status == (401 if expect_401 else 200)

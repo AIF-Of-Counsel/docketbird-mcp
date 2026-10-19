@@ -30,10 +30,12 @@ from mcp.server.auth.provider import (
     AccessToken,
     AuthorizationCode,
     AuthorizationParams,
+    AuthorizeError,
     RefreshToken,
     TokenError,
 )
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
+from mcp.shared.auth_utils import check_resource_allowed
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
 from termcolor import cprint as _cprint
@@ -535,6 +537,14 @@ class DocketBirdAuthProvider:
         self.db = db
         self.server_url = server_url.rstrip("/")
 
+    def _resource_is_this_server(self, resource: str | None) -> bool:
+        """RFC 8707 audience check: the resource must be this server or a path under it.
+
+        No resource is accepted: tokens are opaque rows in this server's own DB, and
+        refreshed tokens and clients that omit `resource` carry None.
+        """
+        return resource is None or check_resource_allowed(resource, self.server_url)
+
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
         """Look up a registered OAuth client (e.g., Claude.ai)."""
         cprint(f"[AUTH] get_client: {client_id}", "cyan")
@@ -553,6 +563,9 @@ class DocketBirdAuthProvider:
         Returns a URL to redirect the user-agent to (our login page).
         """
         cprint(f"[AUTH] authorize: client={client.client_id}, scopes={params.scopes}", "cyan")
+        # RFC 8707: this server issues tokens only for itself.
+        if not self._resource_is_this_server(params.resource):
+            raise AuthorizeError(error="invalid_request", error_description="resource is not this server")
         session_id = await self.db.create_pending_auth(client.client_id, params)
         login_url = f"{self.server_url}/login?auth_session={session_id}"
         cprint(f"[AUTH] Redirecting to login: {login_url}", "yellow")
@@ -626,6 +639,9 @@ class DocketBirdAuthProvider:
     async def load_access_token(self, token: str) -> DocketBirdAccessToken | None:
         """Load and validate an access token. Called on every authenticated request."""
         result = await self.db.get_access_token(token)
+        if result and not self._resource_is_this_server(result.resource):
+            cprint(f"[AUTH] Refused access token for another resource: {result.resource}", "red")
+            return None
         if result:
             cprint(f"[AUTH] Valid access token for user_id={result.user_id}", "cyan")
         return result
